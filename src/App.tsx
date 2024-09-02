@@ -1,246 +1,87 @@
 import {
-  Alert,
   Box,
   Button,
   ButtonProps,
-  Chip,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
   Modal,
   Snackbar,
   styled,
-  TextField,
+  Alert,
 } from "@mui/material";
-import { blue, green, purple, red } from "@mui/material/colors";
-import React, { useEffect, useRef, useState } from "react";
+import { red } from "@mui/material/colors";
+import React, { useState } from "react";
 import { Wheel } from "react-custom-roulette";
-import { WheelData } from "react-custom-roulette/dist/components/Wheel/types";
 import "./App.css";
-import DeleteIcon from "@mui/icons-material/Delete";
-import { useLocation, useNavigate } from "react-router";
-import QueryString from "qs";
-import { z } from "zod";
-import { makeJsonEncoder, makeJsonDecoder } from "@urlpack/json";
 import CloseIcon from "@mui/icons-material/Close";
-import LinkIcon from "@mui/icons-material/Link";
-import axios from "axios";
-import { config } from "./config";
-import to from "await-to-js";
+import { saveAs } from 'file-saver';
 
 const StartButton = styled(Button)<ButtonProps>(({ theme }) => ({
   marginTop: "20px",
   width: "100%",
   fontSize: 20,
-  color: theme.palette.getContrastText(purple[500]),
-  backgroundColor: purple[500],
-  "&:hover": {
-    backgroundColor: "#fff",
-    color: purple[500],
-  },
-}));
-
-const InitButton = styled(Button)<ButtonProps>(({ theme }) => ({
-  width: "100%",
-  height: "45px",
-  fontSize: 20,
-  color: theme.palette.getContrastText(blue[500]),
-  backgroundColor: blue[500],
-  "&:hover": {
-    backgroundColor: "#fff",
-    color: blue[500],
-  },
-}));
-
-const ShareButton = styled(Button)<ButtonProps>(({ theme }) => ({
-  width: "100%",
-  height: "45px",
-  fontSize: 20,
-  color: theme.palette.getContrastText(red[500]),
+  color: "#fff",
   backgroundColor: red[500],
+  padding: "15px",
+  borderRadius: "10px",
   "&:hover": {
-    backgroundColor: "#fff",
-    color: red[500],
+    backgroundColor: red[700],
+    color: "#fff",
   },
 }));
 
-const AddButton = styled(Button)<ButtonProps>(({ theme }) => ({
-  width: "20%",
-  height: "45px",
-  fontSize: 15,
-  color: theme.palette.getContrastText(green[800]),
-  backgroundColor: green[800],
-  "&:hover": {
-    backgroundColor: "#fff",
-    color: green[800],
-  },
-}));
-
-const queryStringZod = z
-  .object({
-    data: z.string().optional(),
-  })
-  .optional();
-
-const wheelDatasZod = z.union([
-  z.array(
-    z.object({
-      option: z.string(),
-    })
-  ),
-  z.array(z.string()),
-]);
-
-const shortenUrlResponseZod = z.object({
-  data: z.object({
-    shortUrl: z.string(),
-  }),
-});
-
-const jsonEncoder = makeJsonEncoder();
-const jsonDecoder = makeJsonDecoder();
+const data = [
+  { option: "1등", style: { backgroundColor: "#f44336", textColor: "white" }, probability: 3 },
+  { option: "2등", style: { backgroundColor: "#2196f3", textColor: "white" }, probability: 7 },
+  { option: "3등", style: { backgroundColor: "#4caf50", textColor: "white" }, probability: 15 },
+  { option: "4등", style: { backgroundColor: "#ffeb3b", textColor: "black" }, probability: 25 },
+  { option: "꽝", style: { backgroundColor: "#9e9e9e", textColor: "black" }, probability: 50 },
+];
 
 function App() {
-  const location = useLocation();
-  const navigate = useNavigate();
   const [mustSpin, setMustSpin] = useState(false);
   const [prizeNumber, setPrizeNumber] = useState(0);
-  const [addValueState, setAddValueState] = useState("");
-  const [data, setData] = useState<WheelData[]>([]);
-  const addInputText = useRef<any>(null);
+  const [isResultShow, setIsResultShow] = useState<boolean>(false);
   const [noti, setNoti] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  const [isResultShow, setIsResultShow] = useState<boolean>(false);
-
-  useEffect(() => {
-    const search = QueryString.parse(location.search, {
-      ignoreQueryPrefix: true,
-    });
-
-    const searchObj = queryStringZod.parse(search);
-    if (searchObj?.data) {
-      const decodeObj = jsonDecoder.decode(searchObj.data);
-      const parseResult = wheelDatasZod.parse(decodeObj);
-
-      const wheelDatas = parseResult.map((result) => {
-        if ((result as WheelData).option) {
-          return result as WheelData;
-        }
-
-        return { option: result as string };
-      });
-
-      setData(wheelDatas);
-    }
-  }, []);
-
   const handleSpinClick = () => {
-    if (mustSpin || data.length < 2) {
-      return;
+    if (mustSpin) return;
+
+    const probabilities = data.map((item) => item.probability);
+    const totalProbability = probabilities.reduce((acc, curr) => acc + curr, 0);
+    const random = Math.random() * totalProbability;
+
+    let cumulativeProbability = 0;
+    let selectedIndex = 0;
+
+    for (let i = 0; i < probabilities.length; i++) {
+      cumulativeProbability += probabilities[i];
+      if (random < cumulativeProbability) {
+        selectedIndex = i;
+        break;
+      }
     }
 
-    const arr = new Uint32Array(1);
-    window.crypto.getRandomValues(arr);
-
-    const newPrizeNumber = arr[0] % data.length;
-
-    setPrizeNumber(newPrizeNumber);
+    setPrizeNumber(selectedIndex);
     setMustSpin(true);
   };
 
-  const getEncodedData = (newData: WheelData[]) => {
-    return jsonEncoder.encode(newData.map((data) => data.option));
-  };
-
-  const refreshQueryString = (newData: WheelData[]) => {
-    const encodeString = getEncodedData(newData);
-    if (encodeString.length > 2000) {
-      alert("너무 많은 데이터");
-      return;
-    }
-    navigate(`?data=${encodeString}`);
-  };
-
-  const handleInitButton = () => {
-    if (mustSpin) {
-      return;
-    }
-
-    setData([]);
-    refreshQueryString([]);
-    setPrizeNumber(0);
-  };
-
-  const handlerSharedButton = () => {
-    const asyncHandler = async () => {
-      const origin = window.location.origin;
-      const encodeString = getEncodedData(data);
-      if (encodeString.length > 2000) {
-        alert("너무 많은 데이터");
-        return;
-      }
-
-      const [err, resp] = await to(
-        axios.post(config.shortenUrlWorkerUrl, {
-          url: `${origin}/?data=${encodeString}`,
-        })
-      );
-
-      const parsed = shortenUrlResponseZod.safeParse(resp?.data);
-
-      const copyURL = parsed.success
-        ? parsed.data.data.shortUrl
-        : window.location.href;
-
-      if (navigator.share as any) {
-        await navigator.share({
-          title: document.title,
-          text: `${data
-            .map((_data) => _data.option)
-            .join(",")
-            .substring(0, 10)}... 룰렛`,
-          url: copyURL,
-        });
-
-        return;
-      } else if (navigator.clipboard) {
-        const [copyErr] = await to(navigator.clipboard.writeText(copyURL));
-        if (copyErr) {
-          setNoti({
-            type: "error",
-            message: "복사 실패, URL을 직접 복사하세요",
-          });
-          return;
-        }
-
-        setNoti({
-          type: "success",
-          message: "복사 성공",
-        });
-      }
+  const saveResult = () => {
+    const resultData = {
+      date: new Date().toISOString(),
+      result: data[prizeNumber]?.option || "Unknown",
     };
 
-    asyncHandler();
-  };
+    const blob = new Blob([JSON.stringify(resultData, null, 2)], {
+      type: "application/json",
+    });
+    saveAs(blob, "data.json");
 
-  const addData = () => {
-    if (mustSpin || addValueState.length < 1) return;
-
-    const newData = [
-      ...data,
-      {
-        option: addValueState,
-      },
-    ];
-    setData(newData);
-    setAddValueState("");
-    refreshQueryString(newData);
-
-    addInputText.current?.focus();
+    setNoti({
+      type: "success",
+      message: "결과가 저장되었습니다.",
+    });
   };
 
   return (
@@ -250,13 +91,7 @@ function App() {
           <h1>룰렛</h1>
           <Wheel
             mustStartSpinning={mustSpin}
-            data={
-              data.length > 0
-                ? data
-                : new Array(4).fill({
-                    option: "항목을 추가하세요",
-                  })
-            }
+            data={data}
             prizeNumber={prizeNumber}
             outerBorderWidth={2}
             innerBorderWidth={2}
@@ -267,6 +102,7 @@ function App() {
             onStopSpinning={() => {
               setMustSpin(false);
               setIsResultShow(true);
+              saveResult();
             }}
             spinDuration={1}
           ></Wheel>
@@ -277,120 +113,6 @@ function App() {
           >
             시작
           </StartButton>
-        </div>
-        <div
-          style={{
-            width: "100px",
-          }}
-        ></div>
-        <div className={"menu-layout"}>
-          <div
-            style={{
-              height: "200px",
-              display: "flex",
-              justifyContent: "center",
-              textAlign: "center",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-              }}
-            >
-              <ShareButton onClick={handlerSharedButton}>
-                <LinkIcon
-                  style={{
-                    position: "absolute",
-                    left: 10,
-                  }}
-                />{" "}
-                공유하기
-              </ShareButton>
-            </div>
-            <div style={{ height: "10px" }}></div>
-            <div
-              style={{
-                width: "100%",
-              }}
-            >
-              <InitButton onClick={handleInitButton}>초기화</InitButton>
-            </div>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-            }}
-          >
-            <TextField
-              inputRef={addInputText}
-              id="add-text"
-              label="항목 추가"
-              variant="standard"
-              InputProps={{ style: { fontSize: 20 } }}
-              InputLabelProps={{ style: { fontSize: 20 } }}
-              style={{
-                width: "80%",
-              }}
-              value={addValueState}
-              onChange={(event) => {
-                setAddValueState(event.target.value);
-              }}
-              onKeyPress={(event) => {
-                if (mustSpin || addValueState.length < 1) return;
-                if (event.key === "Enter") {
-                  addData();
-                }
-              }}
-            />
-            <AddButton
-              onClick={() => {
-                addData();
-              }}
-            >
-              추가하기
-            </AddButton>
-          </div>
-          <div>
-            <List>
-              {data.map((_data, idx) => {
-                return (
-                  <ListItem
-                    key={idx}
-                    secondaryAction={
-                      <IconButton
-                        edge="end"
-                        aria-label="delete"
-                        onClick={() => {
-                          if (mustSpin) return;
-
-                          const tmpData = [...data];
-                          tmpData.splice(idx, 1);
-                          setData(tmpData);
-
-                          refreshQueryString(tmpData);
-                        }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    }
-                  >
-                    <Chip
-                      label={idx + 1}
-                      style={{
-                        marginRight: "5px",
-                      }}
-                    />
-                    <ListItemText
-                      primary={_data.option}
-                      primaryTypographyProps={{ fontSize: "20px" }}
-                    />
-                  </ListItem>
-                );
-              })}
-            </List>
-          </div>
         </div>
       </div>
       <Modal
@@ -418,7 +140,7 @@ function App() {
             overflowY: "auto",
           }}
         >
-          <IconButton
+          <CloseIcon
             aria-label="close"
             onClick={() => {
               setIsResultShow(false);
@@ -429,9 +151,7 @@ function App() {
               top: 8,
               color: (theme) => theme.palette.grey[500],
             }}
-          >
-            <CloseIcon />
-          </IconButton>
+          />
           <span style={{ fontSize: "60px" }}>
             {data[prizeNumber] ? data[prizeNumber].option : ""}
           </span>
