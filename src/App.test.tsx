@@ -330,7 +330,7 @@ function App() {
           setMustSpin(false);
           saveResult();
         }}
-        spinDuration={1}
+        spinDuration={0.2}
         backgroundColors={data.map((item) => item.style.backgroundColor)}
         textColors={data.map((item) => item.style.textColor)}
       />
