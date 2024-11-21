@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Wheel } from "react-custom-roulette";
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Wheel } from 'react-custom-roulette';
 import {
   Box,
   Button,
@@ -8,21 +8,21 @@ import {
   Snackbar,
   Alert,
   styled,
-} from "@mui/material";
-import { red } from "@mui/material/colors";
-import { QrReader } from "react-qr-reader";
-import "./App.css";
-
-// 임시 데이터베이스 배열
-const qrcodesDB = ["digitaltransformation", "nongshim", "lee", "park", "yoon", "jung", "joe"];
-
-// 상품 재고 수량 (가정)
-const inventory = {
-  first: 1,  // 1등 상품 수량
-  second: 2, // 2등 상품 수량
-  third: 5,  // 3등 상품 수량
-  fourth: 10 // 4등 상품 수량
-};
+  Popover,
+  Typography,
+  Card,
+  CardContent,
+} from '@mui/material';
+import { red, grey, yellow, orange, blue } from '@mui/material/colors';
+import { QrReader } from 'react-qr-reader';
+import './App.css';
+import RouletteBorder from './border/roulette-border';
+import prize1 from './products/prize1.png';
+import prize2 from './products/prize2.png';
+import prize3 from './products/prize3.png';
+import prize4 from './products/prize4.png';
+import prize5 from './products/prize5.png';
+import prize6 from './products/prize6.png';
 
 // 데이터 타입 정의
 interface PrizeData {
@@ -32,109 +32,79 @@ interface PrizeData {
     textColor: string;
   };
   probability: number;
-  imageUrl: string;
+  // imageUrl: string;
+  image: {
+    uri: string;
+    offsetX?: number;
+    offsetY?: number;
+    sizeMultiplier?: number;
+    landscape?: boolean;
+  };
 }
 
+type ProductList = {
+  [key: string]: { name: string; quantity: number; img?: string };
+};
+
+const rouletteRed = '#CD2B33';
+const rouletteWhite = '#ffffff';
+
+const productList: ProductList = {
+  prize_1: { name: '로지텍 MX Master 3s 마우스', quantity: 2, img: prize1 },
+  prize_2: { name: '아트뮤 PB310 보조배터리', quantity: 3, img: prize2 },
+  prize_3: { name: '로지텍 R500s 포인터', quantity: 5, img: prize3 },
+  prize_4: { name: '필릭스 LED 에디슨 데스크 램프', quantity: 10, img: prize4 },
+  prize_5: { name: '농심 굿즈', quantity: 30, img: prize5 },
+  prize_6: { name: '농심 제품 + DT FAIR 다회용백', quantity: 150, img: prize6 },
+};
+
+
 // 데이터 배열
-const data: PrizeData[] = [
-  {
-    option: "1등",
-    style: { backgroundColor: "#FFB6C1", textColor: "black" },
-    probability: inventory.first > 0 ? 3 : 0, // 재고 수량에 따른 확률 설정
-    imageUrl:
-      "https://cdn.funshop.co.kr//products/0000294741/vs_image800.jpg?1725245400",
-  },
-  {
-    option: "2등",
-    style: { backgroundColor: "#ADD8E6", textColor: "black" },
-    probability: inventory.second > 0 ? 7 : 0, // 재고 수량에 따른 확률 설정
-    imageUrl:
-      "https://cdn.funshop.co.kr//products/0000262710/vs_image800.jpg?1725245520",
-  },
-  {
-    option: "3등",
-    style: { backgroundColor: "#90EE90", textColor: "black" },
-    probability: inventory.third > 0 ? 15 : 0, // 재고 수량에 따른 확률 설정
-    imageUrl:
-      "https://cdn.funshop.co.kr//products/0000204053/vs_image800.jpg?1725245580",
-  },
-  {
-    option: "4등",
-    style: { backgroundColor: "#FFFACD", textColor: "black" },
-    probability: inventory.fourth > 0 ? 25 : 0, // 재고 수량에 따른 확률 설정
-    imageUrl:
-      "https://cdn.funshop.co.kr//products/0000281263/vs_image800.jpg?1725245640",
-  },
-  {
-    option: "꽝",
-    style: { backgroundColor: "#D3D3D3", textColor: "black" },
-    probability: 50, // 꽝은 항상 확률 유지
-    imageUrl: "",
-  },
-];
+
+
+
+
+
+
 
 const StartButton = styled(Button)<ButtonProps>(({ theme }) => ({
-  marginTop: "20px",
-  width: "200px",
-  fontSize: 20,
-  color: "#fff",
-  backgroundColor: red[500],
-  padding: "10px",
-  borderRadius: "10px",
-  "&:hover": {
-    backgroundColor: red[700],
-    color: "#fff",
+  border: 'none',
+  width: '12rem',
+  height: '12rem',
+  borderRadius: '50%',
+  fontSize: '2rem',
+  zIndex: '1000',
+  boxShadow: '0 0 10px rgba(0, 0, 0, 0.3)',
+  color: '#333',
+  backgroundColor: '#ffffff',
+  fontWeight: 'bold',
+  '&:hover': {
+    backgroundColor: '#020b3e',
+    color: '#ffffff',
+    border: 'none',
   },
 }));
 
 function App() {
-  const [mustSpin, setMustSpin] = useState(false);
-  const [prizeNumber, setPrizeNumber] = useState(0);
+  const [mustSpin, setMustSpin] = useState(false); // 룰렛 회전
+
+  const [hasSpun, setHasSpun] = useState(false); // 스핀 여부를 추적
+
   const [isResultShow, setIsResultShow] = useState<boolean>(false);
-  const [noti, setNoti] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-  const [showQR, setShowQR] = useState(false);
-  const [user, setUser] = useState<string | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  
+  const [updatedProducts, setUpdatedProducts] = useState<ProductList | null>(null);
+
   const [showGif, setShowGif] = useState(false);
-  const [result, setResult] = useState<{ date: string; result: string; qrcode?: string }>({
-    date: "",
-    result: "",
-  });
-  const [lastGameTime, setLastGameTime] = useState<number | null>(null); // 최근 게임 시간 기록
+
+  const [products, setProducts] = useState(productList);
+  const [prize, setPrize] = useState<any>(null);
+  const [prizeNumber, setPrizeNumber] = useState<number>(-1);
+
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
 
   const currentAudio = useRef<HTMLAudioElement | null>(null); // 현재 재생 중인 오디오 트래킹
 
-  useEffect(() => {
-    async function checkCameraPermission() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        stream.getTracks().forEach(track => track.stop());
-        console.log("Camera permission granted");
-      } catch (err) {
-        console.error("Camera permission error:", err);
-        setCameraError("카메라 권한을 허용해주세요.");
-      }
-    }
-    checkCameraPermission();
-  }, []);
-
-  // 오디오 재생 중단 함수
-  const stopCurrentAudio = () => {
-    if (currentAudio.current) {
-      currentAudio.current.pause();
-      currentAudio.current.currentTime = 0;
-    }
-  };
-
   const playAudio = (filePath: string, onEndedCallback?: () => void, interruptible: boolean = true) => {
-    // 특정 파일(예: 룰렛 소리)은 중단되지 않도록 처리
-    if (interruptible) {
-      stopCurrentAudio(); // 새로운 오디오가 시작되면 기존 오디오 중지
-    }
-
     try {
       const audio = new Audio(filePath);
       currentAudio.current = audio; // 현재 재생 중인 오디오 업데이트
@@ -142,287 +112,388 @@ function App() {
         audio.onended = onEndedCallback;
       }
       audio.play().catch((error) => {
-        console.error("Error playing audio:", error);
+        console.error('Error playing audio:', error);
       });
     } catch (error) {
-      console.log("Audio file not found or could not be played:", filePath);
+      console.log('Audio file not found or could not be played:', filePath);
     }
   };
-
-  const playAudioWithDuration = (filePath: string, duration: number, onEndedCallback?: () => void, interruptible: boolean = true) => {
-    // 특정 파일(예: 룰렛 소리)은 중단되지 않도록 처리
-    if (interruptible) {
-      stopCurrentAudio(); // 새로운 오디오가 시작되면 기존 오디오 중지
-    }
   
+  const playAudioWithDuration = (
+    filePath: string,
+    duration: number,
+    onEndedCallback?: () => void,
+    interruptible: boolean = true
+  ) => {
+    // 특정 파일(예: 룰렛 소리)은 중단되지 않도록 처리
+
     try {
       const audio = new Audio(filePath);
       currentAudio.current = audio; // 현재 재생 중인 오디오 업데이트
-  
+
       audio.play().catch((error) => {
-        console.error("Error playing audio:", error);
+        console.error('Error playing audio:', error);
       });
-  
+
       // 주어진 duration (밀리초) 후에 오디오 중단 및 콜백 실행
       setTimeout(() => {
-        stopCurrentAudio();
         if (onEndedCallback) {
           onEndedCallback();
         }
       }, duration);
     } catch (error) {
-      console.log("Audio file not found or could not be played:", filePath);
+      console.log('Audio file not found or could not be played:', filePath);
     }
   };
+  
+  const data = useMemo(() => [
+    {
+      option: products.prize_1.name,
+      style: { backgroundColor: rouletteRed, textColor: '#FFFFFF' },
+      probability: products.prize_1.quantity > 0 ? 3 : 0, // 재고 수량에 따른 확률 설정
+      image: {
+        uri: products.prize_1.img || prize1,
+      },
+    },
+    {
+      option: products.prize_2.name,
+      style: { backgroundColor: rouletteWhite, textColor: '#868686' },
+      probability: products.prize_2.quantity > 0 ? 7 : 0, // 재고 수량에 따른 확률 설정
+      image: { uri: products.prize_2.img || prize2},
+    },
+    {
+      option: products.prize_3.name,
+      style: { backgroundColor: rouletteRed, textColor: '#FFFFFF' },
+      probability: products.prize_3.quantity > 0 ? 15 : 0, // 재고 수량에 따른 확률 설정
+      image: { uri: products.prize_3.img || prize3},
+    },
+    {
+      option: products.prize_4.name,
+      style: { backgroundColor: rouletteWhite, textColor: '#868686' },
+      probability: products.prize_4.quantity > 0 ? 25 : 0, // 재고 수량에 따른 확률 설정
+      image: { uri: products.prize_4.img || prize4},
+    },
+    {
+      option: products.prize_5.name,
+      style: { backgroundColor: rouletteRed, textColor: '#ffffff' },
+      probability: products.prize_5.quantity > 0 ? 35 : 0, // 재고 수량에 따른 확률 설정
+      image: { uri: products.prize_5.img || prize5},
+    },
+    {
+      option: products.prize_6.name,
+      style: { backgroundColor: rouletteWhite, textColor: '#868686' },
+      probability: 150, // 꽝은 항상 확률 유지
+      image: { uri: products.prize_6.img || prize6},
+    },
+  ], [products]); // 의존성 배열에 products 추가
+
+
+  // 로컬 스토리지에서 products 불러오기
+  useEffect(() => {
+    const savedProducts = localStorage.getItem('products');
+    if (savedProducts) {
+      const parsedProducts = JSON.parse(savedProducts);
+      const productsWithImages = Object.keys(parsedProducts).reduce((acc, key) => {
+        acc[key] = {
+          ...parsedProducts[key],
+          img: productList[key].img, // 이미지 정보 추가
+        };
+        return acc;
+      }, {} as ProductList);
+      setProducts(productsWithImages);
+    } else {
+      setProducts(productList);
+    }
+  }, []);
+
+    // handleModalClose 함수 수정
+  const handleModalClose = () => {
+    setIsResultShow(false);
+    if (updatedProducts) {
+      const productsWithImages = Object.keys(updatedProducts).reduce((acc, key) => {
+        acc[key] = {
+          ...updatedProducts[key],
+          img: productList[key].img,
+        };
+        return acc;
+      }, {} as ProductList);
+      setProducts(productsWithImages);
+      localStorage.setItem('products', JSON.stringify(updatedProducts));
+      setUpdatedProducts(null);
+    }
+    setIsButtonDisabled(false);
+  };
+  
+  
+  const sendToGoogleSheets = () => {
+    const participationTime = new Date().toLocaleString(); // 참여 시간 생성
+    const payload = {
+      participationId: Math.floor(Math.random() * 10000).toString(),
+      participationTime: participationTime,
+      prize: data[prizeNumber].option,
+      firstStock: products.prize_1.quantity.toString(),
+      secondStock: products.prize_2.quantity.toString(),
+      thirdStock: products.prize_3.quantity.toString(),
+      fourthStock: products.prize_4.quantity.toString(),
+      fifthStock: products.prize_5.quantity.toString(),
+      sixthStock: products.prize_6.quantity.toString(),
+    };
+  
+    console.log("전송할 데이터:", payload);
+  
+    fetch("https://script.google.com/macros/s/AKfycbza216O1LGIDWyOxz3x7LBC5ZhhooC0Z6Q0Ddi0npvWhLF87SCgGtLn4fzO83W7iNR-/exec", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+      },
+      body: new URLSearchParams(payload).toString(),
+    })
+      .then((response) => {
+        if (response.ok) {
+          console.log("Google Sheets 전송 성공:", response);
+        } else {
+          console.error("Google Sheets 전송 에러:", response);
+          alert("이벤트 응모 중 오류가 발생했습니다.");
+        }
+      })
+      .catch((error) => {
+        console.error("Google Sheets 전송 에러:", error);
+        alert("이벤트 응모 중 오류가 발생했습니다.");
+      });
+  };
+
+
+
+
+  const resetProducts = () => {
+    const defaultProducts: { [key: string]: { name: string; quantity: number } } = {
+      prize_1: { name: '로지텍 MX Master 3s 마우스', quantity: 2 },
+      prize_2: { name: '아트뮤 PB310 보조배터리', quantity: 3 },
+      prize_3: { name: '로지텍 R500s 포인터', quantity: 5 },
+      prize_4: { name: '필릭스 LED 에디슨 데스크 램프', quantity: 10 },
+      prize_5: { name: '농심 굿즈', quantity: 30 },
+      prize_6: { name: '농심 제품 + DT FAIR 다회용백', quantity: 300 },
+    };
+  
+    // 이미지 정보를 제외한 products를 localStorage에 저장
+    localStorage.setItem('products', JSON.stringify(defaultProducts));
+  
+    // 이미지 정보를 다시 추가하여 상태 업데이트
+    const productsWithImages = Object.keys(defaultProducts).reduce((acc, key) => {
+      acc[key] = {
+        ...defaultProducts[key],
+        img: productList[key].img, // 기본 productList에서 이미지 정보 가져오기
+      };
+      return acc;
+    }, {} as ProductList);
+  
+    setProducts(productsWithImages);
+  
+    console.log('상품 정보가 초기화되었습니다.');
+  };
+
 
   
-  // 최근 5분 내에 게임이 시작되었는지 체크
-  const isRecentGameStarted = () => {
-    if (!lastGameTime) return false;
-    const now = Date.now();
-    const fiveMinutesInMillis = 5 * 60 * 1000;
-    return now - lastGameTime < fiveMinutesInMillis;
-  };
-
-  const handleScan = (result: any) => {
-    if (result) {
-      const scannedText = result.text;
-      setUser(scannedText);
-      console.log("Scanned QR URL:", scannedText);
-
-      // DB 검증 로직
-      stopCurrentAudio(); // QR 스캔 시 기존 오디오 중단
-      if (qrcodesDB.includes(scannedText)) {
-        setResult(prev => ({
-          ...prev,
-          date: new Date().toISOString(),
-          qrcode: scannedText,
-        }));
-        setShowQR(false);
-        playAudio('/asset/verify.mp3'); // QR 인증 성공 시 음성 재생
-        handleAuthenticationSuccess();
-      } else {
-        playAudio('/asset/retry.mp3'); // 불일치 피드백
-        setNoti({ type: "error", message: "없는 정보입니다" });
-        setShowQR(false);
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "F9") {
+        handleRouletteStart();
       }
-    } else if (result === null) {
-      console.log("No QR code found");
-    } else if (result instanceof Error) {
-      console.error("QR Reader error:", result);
-      setCameraError(`QR 스캐너 오류: ${result.message}`);
-      setShowQR(false);
+    };
+  
+    window.addEventListener("keydown", handleKeyDown);
+  
+    // 컴포넌트 언마운트 시 이벤트 리스너 제거
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []); // 빈 배열로 설정하여 한 번만 등록
+
+  
+   
+    
+  const getResultMessage = () => {
+    switch (prizeNumber) {
+      case 0:
+        return '🏆 1등 당첨 🎉';
+      case 1:
+        return '🥇 2등 당첨 🎁';
+      case 2:
+        return '🥈 3등 당첨 👏';
+      case 3:
+        return '🥉 4등 당첨 😉';
+      case 4:
+        return '📦 4등 당첨 😉';
+      case 5:
+        return '📦 6등 당첨 😉';
     }
   };
 
-  const startSpeechRecognition = () => {
-    if (isRecentGameStarted()) {
-      console.log("최근 5분 내에 게임이 시작되었습니다. 음성 인식을 생략합니다.");
-      handleSpinClick(); // 음성 인식 없이 바로 게임 진행
+
+  useEffect(() => {
+    // 상품이 선택되었을 때 콘솔 출력
+    if (prize) {
+      console.log(`선택된 상품: ${prize.name}`);
+    }
+  }, [prize]); // prize 상태가 변경될 때 실행
+  
+
+
+  const handleRouletteStart = () => {
+    if (isButtonDisabled || mustSpin) return; // 버튼이 비활성화되었거나 이미 스핀 중이면 실행하지 않음
+  
+    setIsButtonDisabled(true); // 버튼 비활성화
+    setMustSpin(true); // 스핀 시작
+    setHasSpun(true); // 스핀 시작됨을 표시
+  
+    const availableProducts = Object.values(products).filter((product) => product.quantity > 0);
+  
+    if (availableProducts.length === 0) {
+      alert('모든 상품이 소진되었습니다! 😭');
+      setIsButtonDisabled(false);
+      setMustSpin(false); // 스핀 중단
       return;
     }
+  
+    const weightedProducts = availableProducts.flatMap((product) => Array(product.quantity).fill(product));
+    const randomIndex = Math.floor(Math.random() * weightedProducts.length);
+    const selectedPrize = weightedProducts[randomIndex];
+    
+    const prizeIndex = data.findIndex(
+      (item) => item.option === selectedPrize.name
+    );
+  
+    setPrizeNumber(prizeIndex); // 당첨 상품 인덱스 설정
+    setPrize(selectedPrize); // 선택된 상품 설정
+  
+    // 재고 업데이트를 임시 상태에 저장
+    const newProducts = { ...products };
+    const foundKey = Object.keys(newProducts).find(
+      (key) => newProducts[key].name === selectedPrize.name
+    );
+  
+    if (foundKey) {
+      newProducts[foundKey] = {
+        ...newProducts[foundKey],
+        quantity: newProducts[foundKey].quantity - 1,
+      };
+    }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'ko-KR';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event: any) => {
-      const speechResult = event.results[0][0].transcript.trim();
-      console.log("Speech recognition result:", speechResult);
+    // 이미지 정보를 제외한 products를 localStorage에 저장
+    const updatedProductsWithoutImages = Object.keys(newProducts).reduce((acc, key) => {
+      const { img, ...rest } = newProducts[key];
+      acc[key] = rest;
+      return acc;
+    }, {} as { [key: string]: { name: string; quantity: number } });
+    
+    localStorage.setItem('updatedProducts', JSON.stringify(updatedProductsWithoutImages));
+    setUpdatedProducts(updatedProductsWithoutImages);   
 
-      if (speechResult.includes("게임시작") || speechResult.includes("시작")) {
-        playAudio('/asset/intro.mp3'); // 게임 시작 안내 음성
-        handleSpinClick();
-      }
-    };
+  
+    playAudio('/asset/wheel.mp3', undefined, false);
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      playAudio('/asset/intro.mp3'); // 게임 시작 안내 음성
-      handleSpinClick();
-    };
 
-    recognition.start();
-  };
-
-  const handleSpinClick = () => {
-    if (mustSpin || showQR) return;
-    setShowQR(true);
-  };
-
-  const handleAuthenticationSuccess = () => {
-    setNoti({ type: "success", message: "인증이 완료되었습니다" });
     setTimeout(() => {
-      setNoti(null);
-      startRoulette();
-    }, 1000);
-  };
-
-  const startRoulette = () => {
-    const probabilities = data.map((item) => item.probability);
-    const totalProbability = probabilities.reduce((acc, curr) => acc + curr, 0);
-    const random = Math.random() * totalProbability;
-
-    let cumulativeProbability = 0;
-    let selectedIndex = 0;
-
-    for (let i = 0; i < probabilities.length; i++) {
-      cumulativeProbability += probabilities[i];
-      if (random < cumulativeProbability) {
-        selectedIndex = i;
-        break;
-      }
-    }
-
-    setPrizeNumber(selectedIndex);
-    playAudio('/asset/wheel.mp3', undefined, false); // 룰렛 소리 파일: interruptible=false로 중단되지 않음
-    setMustSpin(true);
-    setLastGameTime(Date.now()); // 게임 시작 시간을 현재로 기록
-  };
-
-  const saveResult = () => {
-    const resultData = {
-      ...result,
-      result: data[prizeNumber]?.option || "Unknown",
-    };
-
-    console.log("Result:", resultData);
-
-    // 당첨에 따른 음성 재생
-    const prizeOption = data[prizeNumber]?.option;
-    if (prizeOption) {
-      if (prizeOption === "꽝") {
-        // 꽝: fail1을 3초만 재생 후 fail 재생
-        playAudioWithDuration('/asset/fail1.mp3', 3000, () => playAudio('/asset/fail.mp3'));
+      // 1등 당첨 시 GIF 표시
+      if (prizeIndex === 0) {
+        setShowGif(true);
+        setTimeout(() => {
+          setShowGif(false);
+          setIsResultShow(true);
+        }, 4000); // 4초간 GIF 표시 후 숨김
       } else {
-        // 당첨: win1을 3초만 재생 후 win 재생
-        playAudioWithDuration('/asset/win1.mp3', 3000, () => playAudio('/asset/win.mp3'));
-      }
-    }
-
-    if (prizeOption === "1등") {
-      // 1등 당첨 시 GIF 애니메이션 표시
-      setShowGif(true);
-      setTimeout(() => {
-        setShowGif(false);
         setIsResultShow(true);
-      }, 2000); // 2초간 GIF 표시 후 숨김
-    } else {
-      setIsResultShow(true);
-    }
-  };
+      }
 
-  const getResultMessage = () => {
-    switch (data[prizeNumber].option) {
-      case "1등":
-        return "🏆1등 당첨🎉";
-      case "2등":
-        return "🥇2등 당첨🎁";
-      case "3등":
-        return "🥈3등 당첨👏";
-      case "4등":
-        return "🥉4등 당첨😉";
-      case "꽝":
-        return "🧨꽝💥";
-      default:
-        return "";
-    }
+      playAudioWithDuration('/asset/win1.mp3', 3000, () => playAudio('/asset/win.mp3'));
+    }, 3000);
   };
 
   return (
     <>
       <div className="roulette-layout">
-        <div style={{ textAlign: "center" }}>
-          <h1>룰렛</h1>
-          <Wheel
-            mustStartSpinning={mustSpin}
-            data={data.map((item) => ({
-              option: item.option,
-              style: item.style,
-            }))}
-            prizeNumber={prizeNumber}
-            outerBorderWidth={2}
-            innerBorderWidth={2}
-            radiusLineWidth={3}
-            innerRadius={0}
-            fontSize={20}
-            onStopSpinning={() => {
-              setMustSpin(false);
-              saveResult();
-            }}
-            spinDuration={1}
-            backgroundColors={data.map((item) => item.style.backgroundColor)}
-            textColors={data.map((item) => item.style.textColor)}
+        <div className="headerContainer">
+          <img
+            src="https://image.nongshim.com/groupware/DT_web_poster/image/DT_FAIR_logo.gif"
+            alt="DT FAIR 2024"
+            style={{ width: '400px' }}
           />
-          <StartButton
-            variant="outlined"
-            size="large"
-            onClick={startSpeechRecognition} // 음성 인식 시작
-          >
-            Start
-          </StartButton>
+          <Card variant="outlined" sx={{ margin: '3rem', marginTop: '3rem' }}>
+            <CardContent>
+              <Typography sx={{ color: '#333', fontSize: 18, fontWeight: 'bold', marginBottom: '1rem' }}>
+                잔여 수량
+              </Typography>
+
+              {Object.entries(products).map(([key, product]) => (
+                <Typography sx={{ color: 'text.secondary', mb: 1.5 }} key={key}>
+                  {product.name}: {product.quantity}개
+                </Typography>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+        <div className="container">
+          {/* 테두리 */}
+          <RouletteBorder spin={mustSpin} />
+          {/* <div className="roulette-border"><div className="dots"></div></div> */}
+
+          <div className="innerContainer">
+            <Wheel
+              mustStartSpinning={mustSpin && prizeNumber >= 0}
+              data={data.map((item) => ({
+                option: item.option,
+                style: item.style,
+                image: item.image,
+              }))}
+              // startingOptionIndex={0}
+              prizeNumber={prizeNumber}
+              outerBorderColor={grey[300]}
+              outerBorderWidth={0}
+              innerBorderWidth={1}
+              innerBorderColor={grey[300]}
+              radiusLineWidth={0}
+              innerRadius={10}
+              fontSize={13}
+              onStopSpinning={() => {
+                if (hasSpun) {
+                  setMustSpin(false);
+                  setIsResultShow(true); // 결과를 한 번만 표시
+                  sendToGoogleSheets();
+                  setHasSpun(false); // 스핀 완료됨을 표시
+                  setPrizeNumber(-1); // prizeNumber 리셋
+                }
+              }}
+              spinDuration={0.5}
+              backgroundColors={data.map((item) => item.style.backgroundColor)}
+              textColors={data.map((item) => item.style.textColor)}
+              pointerProps={{
+                src: '', // 커서 이미지 URL
+                style: { display: 'none' },
+              }}
+              perpendicularText={true}
+              textDistance={75}
+            />
+            <div className="btn-container">
+              <StartButton
+                variant="outlined"
+                size="large"
+                className="startBtn"
+                onClick={handleRouletteStart} // 음성 인식 시작
+                disabled={isButtonDisabled}>
+                Start
+              </StartButton>
+            </div>
+          </div>
         </div>
       </div>
 
-      <Modal
-        open={showQR}
-        onClose={() => {
-          setShowQR(false);
-        }}
-        style={{ display: "flex", justifyContent: "center", alignItems: "center" }}
-      >
-        <Box
-          style={{
-            width: "300px", // 가로 크기 조정
-            height: "300px", // 세로 크기 조정
-            backgroundColor: "white",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            position: "relative",
-          }}
-        >
-          {cameraError ? (
-            <div>{cameraError}</div>
-          ) : (
-            <QrReader
-              onResult={handleScan}
-              constraints={{ facingMode: 'environment' }}
-              containerStyle={{ width: "100%", height: "100%" }}
-              videoStyle={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
-          )}
-          <Button
-            onClick={() => setShowQR(false)}
-            style={{
-              marginTop: "10px",
-              position: "absolute",
-              bottom: "10px",
-              left: "50%",
-              transform: "translateX(-50%)",
-            }}
-          >
-            닫기
-          </Button>
-        </Box>
-      </Modal>
-
       {showGif && (
-        <Modal
-          open={true}
-          style={{ display: "flex", justifyContent: "center", alignItems: "center" }}
-        >
+        <Modal open={true} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <img
             src="https://i.namu.wiki/i/aEaRClFwgm0hl2PFb7-j20_WC99GnPFUkg6njz_IckIXXx_UZDELGldWijSZw-IqYOFXeUJNF41HESd380w0Og.gif"
             alt="1등 당첨 축하 GIF"
-            style={{ width: "100vw", height: "100vh", objectFit: "cover" }}
+            style={{ width: '100vw', height: '100vh', objectFit: 'cover' }}
           />
         </Modal>
       )}
@@ -431,68 +502,107 @@ function App() {
         open={isResultShow}
         onClose={() => {
           setIsResultShow(false);
+          if (updatedProducts) {
+            // 이미지 정보를 다시 추가
+            const productsWithImages = Object.keys(updatedProducts).reduce((acc, key) => {
+              acc[key] = {
+                ...updatedProducts[key],
+                img: productList[key].img, // 기본 productList에서 이미지 정보 가져오기
+              };
+              return acc;
+            }, {} as ProductList);
+            setProducts(productsWithImages);
+            // 이미지 정보를 제외하고 로컬 스토리지에 저장
+            localStorage.setItem('products', JSON.stringify(updatedProducts));
+            setUpdatedProducts(null); // 임시 상태 초기화
+          }
+          setIsButtonDisabled(false); // Start 버튼 활성화
         }}
-        style={{ cursor: "pointer" }}
+        style={{ cursor: 'pointer' }}
         onClick={() => {
           setIsResultShow(false);
-        }}
-      >
+          if (updatedProducts) {
+            // 이미지 정보를 다시 추가
+            const productsWithImages = Object.keys(updatedProducts).reduce((acc, key) => {
+              acc[key] = {
+                ...updatedProducts[key],
+                img: productList[key].img, // 기본 productList에서 이미지 정보 가져오기
+              };
+              return acc;
+            }, {} as ProductList);
+            setProducts(productsWithImages);
+            // 이미지 정보를 제외하고 로컬 스토리지에 저장
+            localStorage.setItem('products', JSON.stringify(updatedProducts));
+            setUpdatedProducts(null); // 임시 상태 초기화
+          }
+          setIsButtonDisabled(false); // Start 버튼 활성화
+        }}>
         <Box
           style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            textAlign: "center",
-            backgroundColor: "rgba(255, 255, 255, 0.9)", // 투명도 10% (0.9)
-            width: "640px", // 크기 조정
-            height: "360px", // 크기 조정
-            maxWidth: "100vw",
-            maxHeight: "100vh",
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            overflowY: "auto",
-          }}
-        >
-          {data[prizeNumber].imageUrl && (
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            textAlign: 'center',
+            backgroundColor: 'rgba(255, 255, 255, 1)', // 투명도 10% (0.9)
+            width: '50rem', // 크기 조정
+            height: '30rem', // 크기 조정
+            maxWidth: '100vw',
+            maxHeight: '100vh',
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            overflowY: 'auto',
+            borderRadius: '1rem',
+            flexDirection: 'column',
+          }}>
+          {prizeNumber >= 0 && data[prizeNumber]?.image?.uri && (
             <img
-              src={data[prizeNumber].imageUrl}
+              src={data[prizeNumber].image.uri}
               alt={data[prizeNumber].option}
               style={{
-                position: "absolute",
+                position: 'absolute',
                 top: 0,
                 left: 0,
-                width: "100%",
-                height: "100%",
+                width: '100%',
+                height: '100%',
                 opacity: 0.5,
-                objectFit: "cover",
+                objectFit: 'cover',
               }}
             />
           )}
           <span
             style={{
-              fontSize: "60px",
-              color: "black",
+              fontSize: '70px',
+              color: 'black',
+              fontWeight: 'bold',
               zIndex: 2,
-            }}
-          >
+              marginBottom: '2rem',
+            }}>
             {getResultMessage()}
+          </span>
+          <span
+            style={{
+              fontSize: '40px',
+              color: 'black',
+              zIndex: 2,
+              fontWeight: 'bold',
+            }}>
+            {prize?.name}
           </span>
         </Box>
       </Modal>
 
-      <Snackbar
+      {/* <Snackbar
         open={!!noti}
         onClose={() => {
           setNoti(null);
         }}
-        autoHideDuration={3000}
-      >
-        <Alert severity={noti?.type} variant="filled" sx={{ width: "100%" }}>
+        autoHideDuration={3000}>
+        <Alert severity={noti?.type} variant="filled" sx={{ width: '100%' }}>
           {noti?.message}
         </Alert>
-      </Snackbar>
+      </Snackbar> */}
     </>
   );
 }
