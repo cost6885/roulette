@@ -189,7 +189,6 @@ function App() {
     }
   };
 
-
   
   const sendToGoogleSheets = () => {
     const participationTime = new Date().toLocaleString(); // 참여 시간 생성
